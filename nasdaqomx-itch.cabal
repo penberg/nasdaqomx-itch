@@ -1,0 +1,20 @@
+name:                nasdaqomx-itch
+version:             0.1.0.0
+synopsis:            A Haskell implementation of NASDAQ OMX ITCH protocols.
+-- description:         
+homepage:            https://github.com/penberg/nasdaqomx-itch
+license:             BSD3
+license-file:        LICENSE
+author:              Pekka Enberg
+maintainer:          penberg@iki.fi
+-- copyright:           
+category:            Finance
+build-type:          Simple
+cabal-version:       >=1.8
+
+library
+  exposed-modules:     NASDAQOMX.Nordic.ITCH
+  ghc-options:         -Wall
+  build-depends:       base ==4.5.*
+                     , binary
+                     , bytestring
