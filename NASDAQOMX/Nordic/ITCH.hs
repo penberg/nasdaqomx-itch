@@ -3,7 +3,7 @@
 -- Copyright   : (c) Pekka Enberg, 2014
 -- License     : BSD-style
 --
--- A Haskell implementation of NASDAQ OMX Norid ITCH protocol as specified in:
+-- A Haskell implementation of NASDAQ OMX Nordic ITCH protocol as specified in:
 --
 -- Nordic Equity TotalView-ITCH 
 -- Version 1.90.1 
