@@ -130,8 +130,8 @@ parseSoupFILE = do
                  return msg
 
 parseMessage :: Word8 -> Get Message
-parseMessage msgType = do
-    case (BS.w2c msgType) of
+parseMessage msgType =
+    case BS.w2c msgType of
         'T' -> Seconds
                    <$> getByteString 5  -- Second
         'M' -> Milliseconds
@@ -217,4 +217,4 @@ parseMessage msgType = do
                    <*> getByteString 9  -- Best Bid Quantity
                    <*> getByteString 10 -- Best Ask Price
                    <*> getByteString 9  -- Best Ask Quantity
-        _ -> return $! Unknown
+        _ -> return Unknown
