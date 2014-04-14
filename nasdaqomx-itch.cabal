@@ -18,4 +18,6 @@ library
   build-depends:       base == 4.*
                      , binary
                      , bytestring
+                     , containers
+
   hs-source-dirs:      src
