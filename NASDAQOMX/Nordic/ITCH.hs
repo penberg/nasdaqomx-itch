@@ -16,15 +16,18 @@ module NASDAQOMX.Nordic.ITCH
     , parseMessage
     ) where
 
+import qualified Data.Binary.Get.Internal as BSX (readN)
 import qualified Data.ByteString.Internal as BS (w2c)
+import qualified Data.ByteString.Char8 as B
 import Control.Applicative
-import Data.ByteString
+import Data.Char (isSpace)
 import Data.Binary.Get
 import Data.Word
 
-type Numeric      = ByteString
-type Alphanumeric = ByteString
-type Alphabetic   = ByteString
+type Numeric      = Maybe Int
+type Alphanumeric = B.ByteString
+type Alphabetic   = B.ByteString
+type Price        = B.ByteString
 
 data Message
     = Seconds
@@ -56,13 +59,13 @@ data Message
         , buySellIndicator          :: Alphabetic
         , quantity                  :: Numeric
         , orderBook                 :: Numeric
-        , price                     :: Numeric }
+        , price                     :: Price }
     | AddOrderMPID
         { orderReferenceNumber      :: Numeric
         , buySellIndicator          :: Alphabetic
         , quantity                  :: Numeric
         , orderBook                 :: Numeric
-        , price                     :: Numeric
+        , price                     :: Price
         , attribution               :: Alphabetic }
     | OrderExecuted
         { orderReferenceNumber      :: Numeric
@@ -75,7 +78,7 @@ data Message
         , executedQuantity          :: Numeric
         , matchNumber               :: Numeric
         , printable                 :: Alphabetic
-        , tradePrice                :: Numeric
+        , tradePrice                :: Price
         , ownerParticipantID        :: Alphabetic
         , counterpartyParticipantID :: Alphabetic }
     | OrderCancel
@@ -89,13 +92,13 @@ data Message
         , quantity                  :: Numeric
         , orderBook                 :: Numeric
         , matchNumber               :: Numeric
-        , tradePrice                :: Numeric
+        , tradePrice                :: Price
         , buyerParticipantID        :: Alphabetic
         , sellerParticipantID       :: Alphabetic }
     | CrossTrade
         { quantity                  :: Numeric
         , orderBook                 :: Numeric
-        , crossPrice                :: Numeric
+        , crossPrice                :: Price
         , matchNumber               :: Numeric
         , crossType                 :: Alphabetic
         , numberOfTrades            :: Numeric }
@@ -106,11 +109,11 @@ data Message
         , imbalanceQuantity         :: Numeric
         , imbalanceDirection        :: Alphabetic
         , orderBook                 :: Numeric
-        , equilibriumPrice          :: Numeric
+        , equilibriumPrice          :: Price
         , crossType                 :: Alphabetic
-        , bestBidPrice              :: Numeric
+        , bestBidPrice              :: Price
         , bestBidQuantity           :: Numeric
-        , bestAskPrice              :: Numeric
+        , bestAskPrice              :: Price
         , bestAskQuantity           :: Numeric }
     | Unknown
     | EOF
@@ -129,92 +132,100 @@ parseSoupFILE = do
                  _ <- getWord8 -- LF
                  return msg
 
+getNumeric :: Int -> Get Numeric
+getNumeric n = BSX.readN n $ toInt
+  where
+    toInt :: B.ByteString -> Numeric
+    toInt bs = case B.readInt (B.dropWhile isSpace bs) of
+        Just i -> Just $ fst i
+        _      -> Nothing
+
 parseMessage :: Word8 -> Get Message
 parseMessage msgType =
     case BS.w2c msgType of
         'T' -> Seconds
-                   <$> getByteString 5  -- Second
+                   <$> getNumeric    5  -- Second
         'M' -> Milliseconds
-                   <$> getByteString 3  -- Millisecond
+                   <$> getNumeric    3  -- Millisecond
         'S' -> SystemEvent
                    <$> getByteString 1  -- Event Code
         'O' -> MarketSegmentState
-                   <$> getByteString 3  -- Market Segment ID
+                   <$> getNumeric    3  -- Market Segment ID
                    <*> getByteString 1  -- Event Code
         'R' -> OrderBookDirectory
-                   <$> getByteString 6  -- Order Book
+                   <$> getNumeric    6  -- Order Book
                    <*> getByteString 16 -- Symbol
                    <*> getByteString 12 -- ISIN
-                   <*> getByteString 3  -- Financial Product
+                   <*> getNumeric    3  -- Financial Product
                    <*> getByteString 3  -- Trading Currency
                    <*> getByteString 4  -- MIC
-                   <*> getByteString 3  -- Market Segment ID
-                   <*> getByteString 8  -- Note Codes
-                   <*> getByteString 9  -- Round Lot Size
+                   <*> getNumeric    3  -- Market Segment ID
+                   <*> getNumeric    8  -- Note Codes
+                   <*> getNumeric    9  -- Round Lot Size
         'H' -> OrderBookTradingAction
-                   <$> getByteString 6  -- Order Book
+                   <$> getNumeric    6  -- Order Book
                    <*> getByteString 1  -- Trading State
                    <*> getByteString 1  -- Reserved
                    <*> getByteString 4  -- Reason
         'A' -> AddOrder
-                   <$> getByteString 9  -- Order Reference Number
+                   <$> getNumeric    9  -- Order Reference Number
                    <*> getByteString 1  -- Buy/Sell Indicator
-                   <*> getByteString 9  -- Quantity
-                   <*> getByteString 6  -- Order Book
+                   <*> getNumeric    9  -- Quantity
+                   <*> getNumeric    6  -- Order Book
                    <*> getByteString 10 -- Price
         'F' -> AddOrderMPID
-                   <$> getByteString 9  -- Order Reference Number
+                   <$> getNumeric    9  -- Order Reference Number
                    <*> getByteString 1  -- Buy/Sell Indicator
-                   <*> getByteString 9  -- Quantity
-                   <*> getByteString 6  -- Order Book
+                   <*> getNumeric    9  -- Quantity
+                   <*> getNumeric    6  -- Order Book
                    <*> getByteString 10 -- Price
                    <*> getByteString 4  -- Attribution
         'E' ->  OrderExecuted
-                   <$> getByteString 9  -- Order Reference Number
-                   <*> getByteString 9  -- Executed Quantity
-                   <*> getByteString 9  -- Match Number
+                   <$> getNumeric    9  -- Order Reference Number
+                   <*> getNumeric    9  -- Executed Quantity
+                   <*> getNumeric    9  -- Match Number
                    <*> getByteString 4  -- Participant ID, owner
                    <*> getByteString 4  -- Participant ID, counterparty
         'C' -> OrderExecutedWithPrice
-                   <$> getByteString 9  -- Order Reference Number
-                   <*> getByteString 9  -- Executed Quantity
-                   <*> getByteString 9  -- Match Number
+                   <$> getNumeric    9  -- Order Reference Number
+                   <*> getNumeric    9  -- Executed Quantity
+                   <*> getNumeric    9  -- Match Number
                    <*> getByteString 1  -- Printable
                    <*> getByteString 10 -- Trade Price
                    <*> getByteString 4  -- Participant ID, owner
                    <*> getByteString 4  -- Participant ID, counterparty
         'X' -> OrderCancel
-                   <$> getByteString 9  -- Order Reference Number
-                   <*> getByteString 9  -- Canceled Quantity
+                   <$> getNumeric    9  -- Order Reference Number
+                   <*> getNumeric    9  -- Canceled Quantity
         'D' -> OrderDelete
-                   <$> getByteString 9  -- Order Reference Number
+                   <$> getNumeric    9  -- Order Reference Number
         'P' -> Trade
-                   <$> getByteString 9  -- Order Reference Number
+                   <$> getNumeric    9  -- Order Reference Number
                    <*> getByteString 1  -- Trade Type
-                   <*> getByteString 9  -- Quantity
-                   <*> getByteString 6  -- Order Book
-                   <*> getByteString 9  -- Match Number
+                   <*> getNumeric    9  -- Quantity
+                   <*> getNumeric    6  -- Order Book
+                   <*> getNumeric    9  -- Match Number
                    <*> getByteString 10 -- Trade Price
                    <*> getByteString 4  -- Participant ID, buyer
                    <*> getByteString 4  -- Participant ID, seller
         'Q' -> CrossTrade
-                   <$> getByteString 9  -- Quantity
-                   <*> getByteString 6  -- Order Book
+                   <$> getNumeric    9  -- Quantity
+                   <*> getNumeric    6  -- Order Book
                    <*> getByteString 10 -- Cross Price
-                   <*> getByteString 9  -- Match Number
+                   <*> getNumeric    9  -- Match Number
                    <*> getByteString 1  -- Cross Type
-                   <*> getByteString 10 -- Number of Trades
+                   <*> getNumeric    10 -- Number of Trades
         'B' -> BrokenTrade
-                   <$> getByteString 9  -- Match Number
+                   <$> getNumeric    9  -- Match Number
         'I' -> NOII
-                   <$> getByteString 9  -- Paired Quantity
-                   <*> getByteString 9  -- Imbalance Quantity
+                   <$> getNumeric    9  -- Paired Quantity
+                   <*> getNumeric    9  -- Imbalance Quantity
                    <*> getByteString 1  -- Imbalance Direction
-                   <*> getByteString 6  -- Order Book
+                   <*> getNumeric    6  -- Order Book
                    <*> getByteString 10 -- Equilibrium Price
                    <*> getByteString 1  -- Cross Type
                    <*> getByteString 10 -- Best Bid Price
-                   <*> getByteString 9  -- Best Bid Quantity
+                   <*> getNumeric    9  -- Best Bid Quantity
                    <*> getByteString 10 -- Best Ask Price
-                   <*> getByteString 9  -- Best Ask Quantity
+                   <*> getNumeric    9  -- Best Ask Quantity
         _ -> return Unknown
