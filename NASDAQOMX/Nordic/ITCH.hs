@@ -16,18 +16,17 @@ module NASDAQOMX.Nordic.ITCH
     , parseMessage
     ) where
 
-import qualified Data.Binary.Get.Internal as BSX (readN)
 import qualified Data.ByteString.Internal as BS (w2c)
-import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Char8 as Bc8
 import Control.Applicative
 import Data.Char (isSpace)
 import Data.Binary.Get
 import Data.Word
 
-type Numeric      = Maybe Int
-type Alphanumeric = B.ByteString
-type Alphabetic   = B.ByteString
-type Price        = B.ByteString
+type Numeric      = Int
+type Alphanumeric = Bc8.ByteString
+type Alphabetic   = Bc8.ByteString
+type Price        = Bc8.ByteString
 
 data Message
     = Seconds
@@ -132,13 +131,13 @@ parseSoupFILE = do
                  _ <- getWord8 -- LF
                  return msg
 
-getNumeric :: Int -> Get Numeric
-getNumeric n = BSX.readN n $ toInt
+getNumeric :: Int -> Get Int
+getNumeric n = toInt =<< getByteString n
   where
-    toInt :: B.ByteString -> Numeric
-    toInt bs = case B.readInt (B.dropWhile isSpace bs) of
-        Just i -> Just $ fst i
-        _      -> Nothing
+    toInt :: Bc8.ByteString -> Get Int
+    toInt bs = case Bc8.readInt (Bc8.dropWhile isSpace bs) of
+        Just (i, _) -> pure i
+        _           -> empty
 
 parseMessage :: Word8 -> Get Message
 parseMessage msgType =
